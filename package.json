@@ -1,7 +1,18 @@
 {
   "name": "@nestjs/mcp",
   "version": "0.0.3",
-  "description": "Nest - modern, fast, powerful node.js web framework (@mcp)",
+  "description": "Model Context Protocol servers for NestJS: provider methods become MCP tools, resources and prompts, over Streamable HTTP or stdio.",
+  "keywords": [
+    "nestjs",
+    "nest",
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "ai",
+    "agents",
+    "tools",
+    "llm"
+  ],
   "author": "Kamil Mysliwiec",
   "license": "MIT",
   "url": "https://github.com/nestjs/mcp#readme",
