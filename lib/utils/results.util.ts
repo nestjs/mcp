@@ -9,6 +9,8 @@ import {
   type ReadResourceResult,
 } from '@modelcontextprotocol/server';
 
+/** The keys of a `CallToolResult`: an empty `content` beside any other key is the tool's data. */
+const TOOL_RESULT_KEYS = new Set(['content', 'structuredContent', 'isError', 'resultType', '_meta']);
 /** The keys of a `ReadResourceResult`: an empty `contents` beside any other key is the resource's data. */
 const RESOURCE_RESULT_KEYS = new Set(['contents', 'ttlMs', 'cacheScope', 'resultType', '_meta']);
 
@@ -23,12 +25,17 @@ function hasOnlyKeys(value: object, keys: Set<string>): boolean {
  *
  * With an output schema, the SDK refuses a result that has neither `structuredContent` nor `isError: true`, so a
  * value shaped like a `CallToolResult` without them is the tool's data (a DTO with a `content` array), not a result.
+ * So is an empty `content` beside keys a result does not have (`{ name: 'inbox', content: [] }`).
  */
 export function toCallToolResult(value: unknown, structured: boolean): CallToolResult | InputRequiredResult {
   if (isInputRequiredResult(value)) {
     return value;
   }
-  if (isCallToolResult(value) && (!structured || value.isError === true || value.structuredContent !== undefined)) {
+  if (
+    isCallToolResult(value) &&
+    (value.content.length > 0 || hasOnlyKeys(value, TOOL_RESULT_KEYS)) &&
+    (!structured || value.isError === true || value.structuredContent !== undefined)
+  ) {
     return value;
   }
   if (value === undefined || (value === null && !structured)) {
