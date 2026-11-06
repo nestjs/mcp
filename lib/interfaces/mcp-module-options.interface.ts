@@ -107,7 +107,7 @@ export interface McpModuleOptions {
    * - It runs once per server instance: per request over HTTP; over stdio, per connection, plus once more when the
    *   connection opens with a `server/discover` probe whose instance is discarded (a client falling back to the 2025
    *   handshake), so it may run twice on one connection, with a different `era`.
-   * - When it throws, the request (or connection) fails rather than being served everything.
+   * - When it throws or returns nothing, the request (or connection) fails rather than being served everything.
    */
   filter?: (
     primitives: McpPrimitives,

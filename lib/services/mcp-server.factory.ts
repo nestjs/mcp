@@ -27,8 +27,6 @@ import {
   type McpToolEntry,
 } from './mcp-registry.service.js';
 
-export type { McpServing };
-
 type ToolCallback = (args: unknown, ctx: ServerContext) => Promise<CallToolResult | InputRequiredResult>;
 type ToolCallbackWithoutArgs = (ctx: ServerContext) => Promise<CallToolResult | InputRequiredResult>;
 
@@ -98,21 +96,24 @@ export class McpServerFactory {
 
   /** The registry's primitives the `filter` option keeps for `serving`; all of them without it. */
   private async select(serving: McpServing): Promise<McpPrimitives> {
+    if (!this.options.filter) {
+      return this.registry;
+    }
     const all: McpPrimitives = {
       tools: [...this.registry.tools],
       resources: [...this.registry.resources],
       resourceTemplates: [...this.registry.resourceTemplates],
       prompts: [...this.registry.prompts],
     };
-    if (!this.options.filter) {
-      return all;
-    }
     const kept = await this.options.filter(all, serving);
+    if (typeof kept !== 'object' || kept === null) {
+      throw new TypeError('McpModule: the `filter` option returned no object. Return subsets of what it receives.');
+    }
     return {
-      tools: subset(all.tools, kept?.tools, 'tools'),
-      resources: subset(all.resources, kept?.resources, 'resources'),
-      resourceTemplates: subset(all.resourceTemplates, kept?.resourceTemplates, 'resourceTemplates'),
-      prompts: subset(all.prompts, kept?.prompts, 'prompts'),
+      tools: subset(all.tools, kept.tools, 'tools'),
+      resources: subset(all.resources, kept.resources, 'resources'),
+      resourceTemplates: subset(all.resourceTemplates, kept.resourceTemplates, 'resourceTemplates'),
+      prompts: subset(all.prompts, kept.prompts, 'prompts'),
     };
   }
 

@@ -205,6 +205,12 @@ describe('filter', () => {
     await app.close();
   });
 
+  it('fails the request when it returns nothing', async () => {
+    const app = await createApp('express', moduleWith((() => undefined) as unknown as McpModuleOptions['filter']));
+    await expect(connect(await urlOf(app), 'legacy').then((client) => client.listTools())).rejects.toThrow();
+    await app.close();
+  });
+
   it('fails the request when it returns an entry it was not given', async () => {
     const app = await createApp(
       'express',
