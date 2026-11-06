@@ -1,5 +1,6 @@
 import type { ControllerOptions, ModuleMetadata, Type } from '@nestjs/common';
 import type { Icon } from '@modelcontextprotocol/server';
+import type { McpPrimitives, McpServing } from './mcp-serving.interface.js';
 import type { McpTokenVerifier } from './mcp-token-verifier.interface.js';
 
 /** How the Streamable HTTP endpoint serves requests. */
@@ -93,6 +94,25 @@ export interface McpModuleOptions {
    * application.
    */
   include?: Function[];
+  /**
+   * Picks the primitives a server instance registers, for one HTTP request or one stdio connection: a primitive left
+   * out is neither listed nor callable there (a call to it gets the SDK's unknown-tool, -prompt or -resource error,
+   * before any guard runs). It receives every primitive the application declares and returns subsets of them; a key it
+   * leaves out keeps all of its kind. For what a token's scopes do not cover, `scopes` lists the primitive and
+   * challenges the call (step-up authorization); `filter` hides it, for feature flags, tenants or clients that cannot
+   * ask for more scopes.
+   *
+   * - A kind left with no primitive is not advertised at all: with no tool, the server's capabilities have no `tools`
+   *   and `tools/list` answers "Method not found" rather than an empty list (likewise `resources` and `prompts`).
+   * - It runs once per server instance: per request over HTTP; over stdio, per connection, plus once more when the
+   *   connection opens with a `server/discover` probe whose instance is discarded (a client falling back to the 2025
+   *   handshake), so it may run twice on one connection, with a different `era`.
+   * - When it throws or returns nothing, the request (or connection) fails rather than being served everything.
+   */
+  filter?: (
+    primitives: McpPrimitives,
+    serving: McpServing,
+  ) => Partial<McpPrimitives> | Promise<Partial<McpPrimitives>>;
   http?: McpHttpOptions;
   /** OAuth for the HTTP endpoint. Without it, the endpoint accepts every request its route lets through. */
   auth?: McpAuthOptions;
