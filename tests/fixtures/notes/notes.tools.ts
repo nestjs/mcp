@@ -108,6 +108,11 @@ export class NotesTools {
     return this.notes.list();
   }
 
+  @Resource({ uri: 'notes://inbox', description: 'The inbox folder', mimeType: 'application/json' })
+  inbox() {
+    return { name: 'inbox', contents: ['welcome'] };
+  }
+
   @ResourceTemplate({ uriTemplate: 'notes://{id}', description: 'One note', mimeType: 'text/plain' })
   note({ id }: { id: string }, ctx: McpContext) {
     const note = this.notes.get(id);

@@ -170,9 +170,17 @@ describe.each(adapters.map((adapter) => adapter.name))('Streamable HTTP on %s', 
       const { resources } = await client.listResources();
       expect(resources).toEqual([
         expect.objectContaining({ uri: 'notes://index', name: 'index', mimeType: 'application/json' }),
+        expect.objectContaining({ uri: 'notes://inbox', name: 'inbox', mimeType: 'application/json' }),
       ]);
       const read = await client.readResource({ uri: 'notes://index' });
       expect(JSON.parse((read.contents[0] as { text: string }).text)).toContainEqual({ id: 'welcome', text: 'Read the docs first.' });
+    });
+
+    it('reads a value with a contents property as JSON', async () => {
+      const read = await client.readResource({ uri: 'notes://inbox' });
+      expect(read.contents).toEqual([
+        { uri: 'notes://inbox', mimeType: 'application/json', text: JSON.stringify({ name: 'inbox', contents: ['welcome'] }) },
+      ]);
     });
 
     it('reads through a resource template', async () => {
