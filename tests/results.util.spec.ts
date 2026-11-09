@@ -33,4 +33,19 @@ describe('toReadResourceResult', () => {
   ])('keeps an empty result as it is: %j', (value) => {
     expect(toReadResourceResult(value, uri, undefined)).toBe(value);
   });
+
+  it('converts Uint8Array, ArrayBuffer, and DataView into a binary blob result', () => {
+    const bytes = new Uint8Array([0, 1, 2, 255]);
+    const expected = {
+      contents: [{ uri: uri.href, mimeType: 'application/octet-stream', blob: 'AAEC/w==' }],
+    };
+
+    expect(toReadResourceResult(bytes, uri, undefined)).toEqual(expected);
+    expect(toReadResourceResult(bytes.buffer, uri, undefined)).toEqual(expected);
+
+    const view = new DataView(bytes.buffer, 1, 2);
+    expect(toReadResourceResult(view, uri, 'application/custom')).toEqual({
+      contents: [{ uri: uri.href, mimeType: 'application/custom', blob: 'AQI=' }],
+    });
+  });
 });

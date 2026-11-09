@@ -83,10 +83,14 @@ export function toReadResourceResult(
   if (typeof value === 'string') {
     return { contents: [{ uri: uri.href, ...(mimeType && { mimeType }), text: value }] };
   }
-  if (value instanceof Uint8Array) {
+  if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) {
+    const buffer =
+      value instanceof ArrayBuffer
+        ? Buffer.from(value)
+        : Buffer.from(value.buffer, value.byteOffset, value.byteLength);
     return {
       contents: [
-        { uri: uri.href, mimeType: mimeType ?? 'application/octet-stream', blob: Buffer.from(value).toString('base64') },
+        { uri: uri.href, mimeType: mimeType ?? 'application/octet-stream', blob: buffer.toString('base64') },
       ],
     };
   }

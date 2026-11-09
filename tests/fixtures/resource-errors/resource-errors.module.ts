@@ -81,6 +81,11 @@ class ResourceErrors {
     return new Uint8Array([0, 1, 255]);
   }
 
+  @Resource({ uri: 'resource-errors://success-arraybuffer' })
+  successArrayBuffer() {
+    return new Uint8Array([0, 1, 255]).buffer;
+  }
+
   @Resource({ uri: 'resource-errors://success-formatted' })
   successFormatted() {
     return {
