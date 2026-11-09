@@ -12,6 +12,7 @@ import {
   type ScopeChallengeHandler,
   type ServerContext,
 } from '@modelcontextprotocol/server';
+import { isObservable, lastValueFrom } from 'rxjs';
 import type { McpCallKind, McpContext } from '../interfaces/mcp-context.interface.js';
 import type { McpModuleOptions } from '../interfaces/mcp-module-options.interface.js';
 import type { McpPrimitives, McpServing } from '../interfaces/mcp-serving.interface.js';
@@ -154,7 +155,7 @@ export class McpServerFactory {
     this.observe.nameOperation(`tools/call ${tool.name}`);
     let value: unknown;
     try {
-      value = await tool.handler(input ?? {}, this.createContext('tool', tool.name, undefined, ctx, serving));
+      value = await settle(tool.handler(input ?? {}, this.createContext('tool', tool.name, undefined, ctx, serving)));
     } catch (error) {
       // Nest's exception handler has run the filters, and logged what was not an HttpException.
       return toolErrorResult(error);
@@ -177,7 +178,7 @@ export class McpServerFactory {
     this.observe.nameOperation(`resources/read ${'uriTemplate' in entry ? entry.uriTemplate : entry.uri}`);
     let value: unknown;
     try {
-      value = await entry.handler({ ...(variables as object) }, this.createContext('resource', entry.name, uri, ctx, serving));
+      value = await settle(entry.handler({ ...(variables as object) }, this.createContext('resource', entry.name, uri, ctx, serving)));
     } catch (error) {
       throw toProtocolError(error, uri);
     }
@@ -205,7 +206,7 @@ export class McpServerFactory {
     this.observe.nameOperation(`prompts/get ${prompt.name}`);
     let value: unknown;
     try {
-      value = await prompt.handler(args ?? {}, this.createContext('prompt', prompt.name, undefined, ctx, serving));
+      value = await settle(prompt.handler(args ?? {}, this.createContext('prompt', prompt.name, undefined, ctx, serving)));
     } catch (error) {
       throw toProtocolError(error);
     }
@@ -283,4 +284,13 @@ function scopeChallenge(scopes: string[] | undefined): { scopeChallenge?: ScopeC
 /** `values` without its `undefined` entries: the SDK copies config fields as they are onto the wire. */
 function defined<T extends Record<string, unknown>>(values: T): Partial<T> {
   return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as Partial<T>;
+}
+
+/**
+ * What a handler answered. Nest resolves the Observable of the method itself, but not one an exception filter returns,
+ * as filters outside HTTP do. An Observable that emits nothing rejects, as the method's does.
+ */
+async function settle(answer: unknown): Promise<unknown> {
+  const value = await answer;
+  return isObservable(value) ? lastValueFrom(value) : value;
 }
