@@ -94,6 +94,11 @@ describe.each(adapters.map((adapter) => adapter.name))('Resource conversion erro
         { uri: 'resource-errors://success-binary', mimeType: 'application/octet-stream', blob: 'AAH/' },
       ]);
 
+      const arrayBuffer = await client.readResource({ uri: 'resource-errors://success-arraybuffer' });
+      expect(arrayBuffer.contents).toEqual([
+        { uri: 'resource-errors://success-arraybuffer', mimeType: 'application/octet-stream', blob: 'AAH/' },
+      ]);
+
       const formatted = await client.readResource({ uri: 'resource-errors://success-formatted' });
       expect(formatted.contents).toEqual([
         { uri: 'resource-errors://success-formatted', mimeType: 'text/custom', text: 'preformatted' },
