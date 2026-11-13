@@ -30,12 +30,18 @@ export async function toWebRequest(
 ): Promise<Request> {
   const headers = new Headers();
   for (const [name, value] of Object.entries(req.headers)) {
-    if (value === undefined || HOP_BY_HOP.has(name)) {
+    // HTTP/2 pseudo-headers (`:method`, `:path`) are not headers: `Headers` refuses their names. The host is in
+    // `:authority`, set below.
+    if (value === undefined || HOP_BY_HOP.has(name) || name.startsWith(':')) {
       continue;
     }
     for (const item of Array.isArray(value) ? value : [value]) {
       headers.append(name, item);
     }
+  }
+  const host = hostOf(req);
+  if (host !== undefined && !headers.has('host')) {
+    headers.set('host', host);
   }
 
   const method = req.method ?? 'GET';
@@ -101,10 +107,16 @@ export async function writeWebResponse(response: Response, res: ServerResponse, 
   }
 }
 
+/** The `Host` header, or under HTTP/2, which has none, the `:authority` pseudo-header. */
+function hostOf(req: IncomingMessage): string | undefined {
+  const authority = req.headers[':authority'];
+  return req.headers.host ?? (typeof authority === 'string' ? authority : undefined);
+}
+
 function requestUrl(req: IncomingMessage): URL {
   const protocol = (req.socket as TLSSocket | undefined)?.encrypted ? 'https' : 'http';
   try {
-    return new URL(req.url ?? '/', `${protocol}://${req.headers.host ?? 'localhost'}`);
+    return new URL(req.url ?? '/', `${protocol}://${hostOf(req) ?? 'localhost'}`);
   } catch {
     return new URL(req.url ?? '/', `${protocol}://localhost`);
   }
