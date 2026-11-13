@@ -30,7 +30,8 @@ export async function toWebRequest(
 ): Promise<Request> {
   const headers = new Headers();
   for (const [name, value] of Object.entries(req.headers)) {
-    if (value === undefined || HOP_BY_HOP.has(name)) {
+    // HTTP/2 pseudo-headers (`:method`, `:path`) are not headers: `Headers` refuses their names.
+    if (value === undefined || HOP_BY_HOP.has(name) || name.startsWith(':')) {
       continue;
     }
     for (const item of Array.isArray(value) ? value : [value]) {
