@@ -23,6 +23,17 @@ describe.each(adapters.map((adapter) => adapter.name))('enhancers on %s', (adapt
     await app?.close();
   });
 
+  it('sends the headers that an interceptor of the HTTP route sets on the response', async () => {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+    });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('x-request-id')).toBe('req-1');
+    expect(await response.text()).toContain('"name":"ping"');
+  });
+
   describe.each(eras)('%s client', (era) => {
     let client: Client;
     let admin: Client;
