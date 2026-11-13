@@ -182,7 +182,18 @@ export class McpHttpService implements OnModuleInit, OnApplicationShutdown {
   private unwrap(platformRequest: unknown, platformResponse: unknown) {
     if (this.adapterHost.httpAdapter?.getType() === 'fastify') {
       const request = platformRequest as { raw: IncomingMessage; body?: unknown };
-      const reply = platformResponse as { raw: ServerResponse; hijack(): void };
+      const reply = platformResponse as {
+        raw: ServerResponse;
+        hijack(): void;
+        getHeaders(): Record<string, number | string | string[] | undefined>;
+      };
+      // A hijacked reply never sends the headers that hooks, plugins and interceptors set on it: copy them to the raw
+      // response, as the other routes get them. The SDK's own headers, written with the status, still take precedence.
+      for (const [name, value] of Object.entries(reply.getHeaders())) {
+        if (value !== undefined && !FRAMING_HEADERS.has(name)) {
+          reply.raw.setHeader(name, value);
+        }
+      }
       reply.hijack();
       return { req: request.raw, res: reply.raw, body: request.body };
     }
@@ -191,6 +202,9 @@ export class McpHttpService implements OnModuleInit, OnApplicationShutdown {
     return { req, res: platformResponse as ServerResponse, body: req.body };
   }
 }
+
+/** Headers that describe the body Fastify would have sent, not the one the endpoint writes. */
+const FRAMING_HEADERS = new Set(['content-length', 'content-encoding', 'transfer-encoding', 'connection']);
 
 function hostnames(value: unknown, option: string): string[] | undefined {
   if (value === undefined) {

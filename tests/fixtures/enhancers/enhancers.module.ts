@@ -74,13 +74,17 @@ export class GlobalGuard implements CanActivate {
   }
 }
 
-/** Every call, globally (APP_INTERCEPTOR): before and after. */
+/** Every call, globally (APP_INTERCEPTOR): before and after. On the HTTP route, it sets a header on the response. */
 @Injectable()
 export class GlobalInterceptor implements NestInterceptor {
   constructor(private readonly log: CallLog) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     if (context.getType<McpContextType>() !== 'mcp') {
+      if (context.getType() === 'http') {
+        const response = context.switchToHttp().getResponse<{ header(name: string, value: string): unknown }>();
+        response.header('x-request-id', 'req-1');
+      }
       return next.handle();
     }
     const name = McpExecutionContext.create(context).getName();
