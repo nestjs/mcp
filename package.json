@@ -1,6 +1,6 @@
 {
   "name": "@nestjs/mcp",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Model Context Protocol servers for NestJS: provider methods become MCP tools, resources and prompts, over Streamable HTTP or stdio.",
   "keywords": [
     "nestjs",
