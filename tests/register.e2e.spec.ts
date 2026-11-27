@@ -436,6 +436,37 @@ describe('McpRegistry.register()', () => {
       ).toThrow(/must be on singleton providers/);
       expect(registry.tools.map((tool) => tool.name)).not.toContain('scoped');
     });
+
+    it('rejects a missing name, an unknown kind, a resource URI that is no URI and an empty URI template', async () => {
+      const registry = await registryOf(appModule());
+      const before = registry.size;
+
+      expect(() => registry.register({ kind: 'tool', host: DataTools, handler: () => 'x' } as never)).toThrow(
+        /a registration needs a `host` provider class, a `name` and a `handler` function/,
+      );
+      expect(() => registry.register({ kind: 'tools', name: 'x', host: DataTools, handler: () => 'x' } as never)).toThrow(
+        /`kind` must be "tool", "resource", "resource-template" or "prompt"\. Got "tools"/,
+      );
+      expect(() =>
+        registry.register({
+          kind: 'resource',
+          name: 'bad',
+          host: DataTools,
+          options: { uri: 'not a uri' },
+          handler: () => 'x',
+        }),
+      ).toThrow(/DataTools register\("bad"\): a resource needs \{ uri \}/);
+      expect(() =>
+        registry.register({
+          kind: 'resource-template',
+          name: 'empty',
+          host: DataTools,
+          options: { uriTemplate: '' },
+          handler: () => 'x',
+        }),
+      ).toThrow(/a resource template needs \{ uriTemplate \}/);
+      expect(registry.size).toBe(before);
+    });
   });
 
   describe('filter', () => {
@@ -566,6 +597,77 @@ describe('McpRegistry.register()', () => {
       expect(await second.tools()).toEqual(['late']);
       await second.close();
       await moduleRef.close();
+    });
+  });
+
+  describe('an entry registered from a constructor', () => {
+    it('is added once the host and its enhancers are built', async () => {
+      @Injectable()
+      @UseGuards(KeyGuard)
+      class EarlyTools {
+        readonly label = 'early';
+
+        constructor(registry: McpRegistry) {
+          registry.register({
+            kind: 'tool',
+            name: 'early',
+            host: EarlyTools,
+            handler(this: EarlyTools) {
+              return this.label;
+            },
+          });
+        }
+      }
+      @Module({
+        imports: [McpModule.forRoot({ name: 'early', version: '1.0.0' })],
+        providers: [CallLog, EarlyTools],
+      })
+      class EarlyModule {}
+
+      const moduleRef = await init(EarlyModule);
+      const client = await connectMcpClient(moduleRef, open);
+      expect(text(await client.callTool({ name: 'early' }))).toBe('early');
+      expect(moduleRef.get(CallLog).entries).toContain('host guard tool early');
+      await client.close();
+      await moduleRef.close();
+    });
+  });
+
+  describe('a host in a feature module', () => {
+    @Injectable()
+    class FeatureTools implements OnModuleInit {
+      constructor(private readonly registry: McpRegistry) {}
+
+      onModuleInit() {
+        this.registry.register({
+          kind: 'tool',
+          name: 'feature',
+          host: FeatureTools,
+          handler: () => 'from a feature',
+        });
+      }
+    }
+    @Module({ providers: [FeatureTools] })
+    class FeatureModule {}
+
+    function rootModule(isGlobal?: boolean) {
+      @Module({
+        imports: [McpModule.forRoot({ name: 'features', version: '1.0.0', isGlobal }), FeatureModule],
+      })
+      class RootModule {}
+      return RootModule;
+    }
+
+    it('injects McpRegistry when the module is global', async () => {
+      const moduleRef = await init(rootModule(true));
+      const client = await connectMcpClient(moduleRef);
+      expect(text(await client.callTool({ name: 'feature' }))).toBe('from a feature');
+      await client.close();
+      await moduleRef.close();
+    });
+
+    it('cannot inject McpRegistry when it is not', async () => {
+      await expect(init(rootModule())).rejects.toThrow(/McpRegistry/);
     });
   });
 });

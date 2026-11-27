@@ -8,7 +8,7 @@ export function assertToolName(name: unknown, where: string): asserts name is st
   if (typeof name !== 'string' || !TOOL_NAME.test(name)) {
     throw new TypeError(
       `${where}: ${JSON.stringify(name)} is not a valid tool name. Tool names have 1 to 128 characters out of ` +
-        'A-Z, a-z, 0-9, "_", "-" and ".", and do not start or end with "-" or ".". Set { name } in @Tool().',
+        'A-Z, a-z, 0-9, "_", "-" and ".", and do not start or end with "-" or ".". Set { name } in @Tool(), or the name given to register().',
     );
   }
 }
