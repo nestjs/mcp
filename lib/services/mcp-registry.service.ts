@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleInit, type Type } from '@nestjs/common';
 import { DiscoveryService, ExternalContextCreator, MetadataScanner } from '@nestjs/core';
 import { McpParamsFactory, recordHandlerParams } from '../context/mcp-params.js';
 import type { McpContext } from '../interfaces/mcp-context.interface.js';
@@ -49,6 +49,20 @@ export interface McpPromptEntry extends Entry<PromptOptions> {
   argsSchema?: McpSchema;
 }
 
+type Data<TOptions> = Omit<TOptions, 'name'>;
+
+/**
+ * A primitive defined as data, for `McpRegistry.register()`. Its `handler` is called as `(input, context)` (with the
+ * `host` instance as `this`, when it is a `function`), through the enhancers of the `host` provider's class and the
+ * global ones, as a decorated method of that class would be.
+ */
+export type McpRegistration = { host: Type<unknown>; handler: (input: any, context: McpContext) => unknown } & (
+  | { kind: 'tool'; name: string; options?: Data<ToolOptions> }
+  | { kind: 'resource'; name: string; options: Data<ResourceOptions> }
+  | { kind: 'resource-template'; name: string; options: Data<ResourceTemplateOptions> }
+  | { kind: 'prompt'; name: string; options?: Data<PromptOptions> }
+);
+
 /**
  * The application's tools, resources and prompts, found once at startup on the providers of the application (or of
  * the `include` modules), each with its method wrapped by Nest's enhancers. The servers built per request or per
@@ -81,6 +95,31 @@ export class McpRegistry implements OnModuleInit {
     return this.tools.length + this.resources.length + this.resourceTemplates.length + this.prompts.length;
   }
 
+  /**
+   * Adds a primitive defined as data, checked as a decorated one is, and served by the servers built from now on: the
+   * next HTTP request, the next stdio connection. Its handler runs through the guards, interceptors, pipes and
+   * exception filters of the `host` provider's class and the global ones. The `host` must be a singleton provider.
+   */
+  register(registration: McpRegistration): void {
+    const { host, kind, name, handler } = registration;
+    const where = `${host?.name ?? 'register()'} register(${JSON.stringify(name)})`;
+    if (typeof host !== 'function' || typeof handler !== 'function') {
+      throw new TypeError(`${where}: a registration needs a \`host\` provider class and a \`handler\` function.`);
+    }
+    const wrapper = this.discovery.getProviders().find((provider) => provider.metatype === host && !provider.isAlias);
+    if (!wrapper?.instance || typeof wrapper.instance !== 'object') {
+      throw new Error(`${where}: ${host.name} is not a provider of the application.`);
+    }
+    this.assertStatic(wrapper, where);
+
+    const metadata = { kind, options: { ...registration.options, name } } as McpPrimitiveMetadata;
+    assertScopes(metadata.options.scopes, where);
+    if (this.scanned) {
+      this.assertScopesAreEnforced([{ where, options: metadata.options }]);
+    }
+    this.add(metadata, String(name), where, this.wrap(wrapper.instance, handler as never, `mcp:${kind}:${String(name)}`));
+  }
+
   /** Finds the primitives, once. */
   scan(): void {
     if (this.scanned) {
@@ -105,32 +144,39 @@ export class McpRegistry implements OnModuleInit {
         }
 
         const where = `${wrapper.metatype?.name ?? instance.constructor.name}.${methodName}`;
-        if (!wrapper.isDependencyTreeStatic()) {
-          throw new Error(
-            `${where}: MCP tools, resources and prompts must be on singleton providers, and this one is ` +
-              'request-scoped or transient (or depends on a request-scoped provider). Request-scoped providers are not ' +
-              'supported yet.',
-          );
-        }
-
-        recordHandlerParams(instance.constructor, methodName);
-        const handler = this.externalContextCreator.create(
-          instance,
-          method,
-          methodName,
-          MCP_PARAMS_METADATA,
-          this.paramsFactory,
-          undefined,
-          undefined,
-          undefined,
-          MCP_CONTEXT_TYPE,
-        ) as McpHandler;
-        this.add(metadata, methodName, where, handler);
+        this.assertStatic(wrapper, where);
+        this.add(metadata, methodName, where, this.wrap(instance, method, methodName));
       }
     }
 
     this.assertScopesAreEnforced();
     this.scanned = true;
+  }
+
+  private assertStatic(wrapper: { isDependencyTreeStatic(): boolean }, where: string) {
+    if (!wrapper.isDependencyTreeStatic()) {
+      throw new Error(
+        `${where}: MCP tools, resources and prompts must be on singleton providers, and this one is ` +
+          'request-scoped or transient (or depends on a request-scoped provider). Request-scoped providers are not ' +
+          'supported yet.',
+      );
+    }
+  }
+
+  /** `method` behind the enhancers of `instance`'s class, called as `(input, context)`. */
+  private wrap(instance: object, method: Function, methodName: string): McpHandler {
+    recordHandlerParams(instance.constructor, methodName);
+    return this.externalContextCreator.create(
+      instance,
+      method as never,
+      methodName,
+      MCP_PARAMS_METADATA,
+      this.paramsFactory,
+      undefined,
+      undefined,
+      undefined,
+      MCP_CONTEXT_TYPE,
+    ) as McpHandler;
   }
 
   private add(metadata: McpPrimitiveMetadata, methodName: string, where: string, handler: McpHandler) {
@@ -203,13 +249,18 @@ export class McpRegistry implements OnModuleInit {
    * The SDK checks `scopes` only against a verified token, and lets a request without one through: scopes declared
    * on an HTTP endpoint without `auth` would protect nothing.
    */
-  private assertScopesAreEnforced() {
+  private assertScopesAreEnforced(
+    entries: { where: string; options: object }[] = [
+      ...this.tools,
+      ...this.resources,
+      ...this.resourceTemplates,
+      ...this.prompts,
+    ],
+  ) {
     if (this.options.auth || this.endpoint.path === null) {
       return;
     }
-    const scoped = [...this.tools, ...this.resources, ...this.resourceTemplates, ...this.prompts].find(
-      (entry) => (entry.options as { scopes?: string[] }).scopes,
-    );
+    const scoped = entries.find((entry) => (entry.options as { scopes?: string[] }).scopes);
     if (scoped) {
       throw new Error(
         `${scoped.where} declares { scopes }, which are only checked against a verified access token. Configure the ` +
