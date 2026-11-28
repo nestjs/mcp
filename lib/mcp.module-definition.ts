@@ -9,13 +9,13 @@ import { DEFAULT_MCP_PATH, MCP_HTTP_ENDPOINT, MCP_MODULE_OPTIONS } from './mcp.c
 
 /**
  * `forRoot()`'s options: the module options and, at the top level, its structure (`path`, `endpointVersion`,
- * `decorators`, `imports`).
+ * `decorators`, `imports`, `isGlobal`).
  */
 export type McpModuleRootOptions = McpModuleOptions & McpModuleStructure;
 
 /**
- * What `forRootAsync()` takes: `path`, `endpointVersion`, `decorators` and `imports` at the top level, and one of `useFactory`,
- * `useClass` or `useExisting` for the rest of the options.
+ * What `forRootAsync()` takes: `path`, `endpointVersion`, `decorators`, `imports` and `isGlobal` at the top level, and
+ * one of `useFactory`, `useClass` or `useExisting` for the rest of the options.
  */
 export type McpModuleAsyncOptions = ConfigurableModuleAsyncOptions<McpModuleOptions, 'createMcpOptions'> &
   McpModuleStructure;
@@ -31,11 +31,12 @@ export const { ConfigurableModuleClass, OPTIONS_TYPE, ASYNC_OPTIONS_TYPE } = new
   .setClassMethodName('forRoot')
   .setFactoryMethodName('createMcpOptions')
   .setExtras<McpModuleStructure>(
-    { path: DEFAULT_MCP_PATH, endpointVersion: undefined, decorators: undefined, imports: undefined },
-    (definition, { path, endpointVersion, decorators, imports }) => {
+    { path: DEFAULT_MCP_PATH, endpointVersion: undefined, decorators: undefined, imports: undefined, isGlobal: false },
+    (definition, { path, endpointVersion, decorators, imports, isGlobal }) => {
       const served = normalizePath(path);
       return {
         ...definition,
+        global: isGlobal,
         imports: [...(definition.imports ?? []), ...(imports ?? [])],
         controllers: served === null ? [] : [createMcpController(served, endpointVersion, decorators ?? [])],
         providers: [...(definition.providers ?? []), { provide: MCP_HTTP_ENDPOINT, useValue: { path: served } }],

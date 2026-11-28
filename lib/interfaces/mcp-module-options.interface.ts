@@ -142,6 +142,11 @@ export interface McpModuleStructure {
   decorators?: ClassDecorator[];
   /** Modules whose exports a `verifier` class injects. */
   imports?: ModuleMetadata['imports'];
+  /**
+   * Whether `McpRegistry`, `McpHttpService` and `McpStdioServer` can be injected in every module without importing
+   * this one, e.g. by a feature module's provider that calls `McpRegistry.register()`. Default `false`.
+   */
+  isGlobal?: boolean;
 }
 
 /** What a class passed to `forRootAsync({ useClass })` implements. */

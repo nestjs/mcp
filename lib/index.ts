@@ -43,6 +43,7 @@ export { McpStdioLogger, McpStdioServer, type McpStdioListenOptions } from './st
 export {
   McpRegistry,
   type McpPromptEntry,
+  type McpRegistration,
   type McpResourceEntry,
   type McpResourceTemplateEntry,
   type McpToolEntry,
