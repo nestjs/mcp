@@ -50,8 +50,8 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@commitlint/cli": "21.2.4",
-    "@commitlint/config-angular": "21.2.4",
+    "@commitlint/cli": "21.3.0",
+    "@commitlint/config-angular": "21.3.0",
     "@modelcontextprotocol/client": "2.4.0",
     "@modelcontextprotocol/server": "2.4.0",
     "@nestjs/authentication": "0.1.8",
